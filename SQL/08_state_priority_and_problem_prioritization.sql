@@ -1,51 +1,54 @@
 use e_commerce;
 /*
-Step 8 — State Priority Analysis
+Step 8 — State Priority and Problem Prioritization Analysis
 
 Purpose:
 Analyze customer states by order volume, revenue, delivery performance,
-late delivery rate, average delay days, review score, and priority level.
-This helps identify which states need the most business attention.
+late delivery rate, average delay days, review score, review score gap,
+and priority level.
+
+This analysis helps identify which states need the most business attention
+and prioritize business problems based on operational and customer satisfaction impact.
 */
 
---check the distribuation by state(how many customer exist in each state) 
+-- Check customer distribution by state
 select
 	customer_state,
-	count(distinct customer_unique_id) as total_customer
+	count(distinct customer_unique_id) as total_customers
 from customer
 group by 
 	customer_state
 order by 
-	total_customer desc;
+	total_customers desc;
 
 --count order by customer state
 select 
 	c.customer_state,
-	count(distinct c.customer_unique_id) as Total_customer,
-	count(distinct o.order_id) as Delivered_orders
+	count(distinct c.customer_unique_id) as total_customers,
+	count(distinct o.order_id) as delivered_orders
 from customer c
-join orders o 
+join order o 
 	on o.customer_id = c.customer_id
 where 
 	o.order_status = 'delivered'
 group by 
 	customer_state
 order by 
-	Delivered_orders desc;
+	delivered_orders desc;
 
 --Revenue and AOV by customer state
 select 
 	c.customer_state,
-	count(distinct c.customer_unique_id) as Total_customer,
-	count(distinct o.order_id) as Delivered_orders,
+	count(distinct c.customer_unique_id) as total_customers,
+	count(distinct o.order_id) as delivered_orders,
 	cast(
-		sum(oi.price + oi.freight_value) as decimal(10,2)) as Total_revenue,
+		sum(oi.price + oi.freight_value) as decimal(10,2)) as total_revenue,
 	cast(
 		cast(
 			sum(oi.price + oi.freight_value) as decimal(10,2)) /count(distinct o.order_id) as decimal(10,2)) as AOV
 
 from customer c
-join orders o 
+join order o 
 	on o.customer_id = c.customer_id
 join order_items oi 
 	on o.order_id = oi.order_id
@@ -62,10 +65,10 @@ select
 	c.customer_state,
 	count(distinct order_id) as delivered_order,
 	count(distinct
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then order_id end ) as late_orders,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then order_id end ) as late_order,
 	cast(count(distinct
 		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then order_id end ) *100.0 / count(distinct order_id) as decimal(10,2)) as late_delivery_rate
-from orders o 
+from order o 
 join customer c 
 	 on o.customer_id = c.customer_id
 where 
@@ -88,7 +91,7 @@ select
 			o.order_delivered_customer_date > o.order_estimated_delivery_date 
 			then 
 			cast(datediff(day,o.order_estimated_delivery_date,order_delivered_customer_date) as float) end ) as decimal(10,2)) as avg_late_delay_days
-from orders o 
+from order o 
 join customer c 
 	 on o.customer_id = c.customer_id
 where 
@@ -107,7 +110,7 @@ select
 	cast(avg(
 			cast(datediff(day,o.order_purchase_timestamp,order_delivered_customer_date) as float)) as decimal(10,2) ) as avg_delivery_days,
 	count(distinct
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_orders,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_order,
 	cast(count(distinct
 		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) *100.0 / count(distinct o.order_id) as decimal(10,2)) as late_delivery_rate,
 	cast(avg(
@@ -117,7 +120,7 @@ select
 			cast(datediff(day,o.order_estimated_delivery_date,order_delivered_customer_date) as float) end ) as decimal(10,2)) as avg_late_delay_days,
 	round(avg(
 			cast(r.review_score as float)),2) as avg_review_score
-from orders o 
+from order o 
 join customer c 
 	 on o.customer_id = c.customer_id
 join order_items oi 
@@ -141,7 +144,7 @@ select
 	cast(avg(
 			cast(datediff(day,o.order_purchase_timestamp,order_delivered_customer_date) as float)) as decimal(10,2) ) as avg_delivery_days,
 	count(distinct
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_orders,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_order,
 	cast(count(distinct
 		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) *100.0 / count(distinct o.order_id) as decimal(10,2)) as late_delivery_rate,
 	cast(avg(
@@ -152,16 +155,16 @@ select
 	round(avg(
 			cast(r.review_score as float)),2) as avg_review_score,
 	cast(avg(
-		case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as On_time_delivered_review,
+		case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as on_time_delivered_review,
 	cast(avg(
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as Late_delivered_review,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as late_delivered_review,
 	cast(
 		cast(avg(
 			case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2))
 			-
 	cast(avg(
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as float) as Review_score_gap
-from orders o 
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as float) as review_score_gap
+from order o 
 join customer c 
 	 on o.customer_id = c.customer_id
 left join order_reviews r
@@ -173,7 +176,7 @@ where
 group by 
 	customer_state
 order by
-	Review_score_gap desc ;
+	review_score_gap desc ;
 
 --state priority level
 with state_performance as (
@@ -183,7 +186,7 @@ select
 	cast(avg(
 			cast(datediff(day,o.order_purchase_timestamp,order_delivered_customer_date) as float)) as decimal(10,2) ) as avg_delivery_days,
 	count(distinct
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_orders,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) as late_order,
 	cast(count(distinct
 		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then o.order_id end ) *100.0 / count(distinct o.order_id) as decimal(10,2)) as late_delivery_rate,
 	cast(avg(
@@ -194,15 +197,15 @@ select
 	round(avg(
 			cast(r.review_score as float)),2) as avg_review_score,
 	cast(avg(
-		case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as On_time_delivered_review,
+		case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as on_time_delivered_review,
 	cast(avg(
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as Late_delivered_review,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as late_delivered_review,
 	cast(
 		cast(avg(
 			case when o.order_delivered_customer_date <= o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2))
 			-
 	cast(avg(
-		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as float) as Review_score_gap,
+		case when o.order_delivered_customer_date > o.order_estimated_delivery_date then cast(r.review_score as float)end) as decimal(10,2)) as float) as review_score_gap,
 	CASE
     WHEN 
         COUNT(DISTINCT CASE 
@@ -243,8 +246,8 @@ select
     THEN 'Medium Priority'
 
     ELSE 'Low Priority'
-	END AS priority_levels
-from orders o 
+	END AS priority_level
+from order o 
 join customer c 
 	 on o.customer_id = c.customer_id
 left join order_reviews r
@@ -258,12 +261,12 @@ group by
 )
 select * from state_performance
 order by
-case when priority_levels ='High Priority' then 1
-	when priority_levels = 'lowe Priority' then 2
+case when priority_level ='High Priority' then 1
+	when priority_level = 'Medium Priority' then 2
 	else 3 end ,
-late_orders desc;
+late_order desc;
 
---Revnue with priority 
+-- Revenue with priority level 
 
 WITH state_delivery_reviews AS (
     SELECT 
@@ -279,7 +282,7 @@ WITH state_delivery_reviews AS (
         COUNT(DISTINCT CASE 
             WHEN o.order_delivered_customer_date > o.order_estimated_delivery_date 
             THEN o.order_id 
-        END) AS late_orders,
+        END) AS late_order,
 
         CAST(
             COUNT(DISTINCT CASE 
@@ -331,7 +334,7 @@ WITH state_delivery_reviews AS (
             AS DECIMAL(10,2)
         ) AS review_score_gap
 
-FROM orders o
+FROM order o
 JOIN customer c
      ON o.customer_id = c.customer_id
 LEFT JOIN order_reviews r
@@ -360,7 +363,7 @@ state_revenue AS (
             AS DECIMAL(10,2)
         ) AS AOV
 
-FROM orders o
+FROM order o
 JOIN customer c
 	ON o.customer_id = c.customer_id
 JOIN order_items oi
@@ -379,7 +382,7 @@ SELECT
         r.total_revenue,
         r.AOV,
         d.avg_delivery_days,
-        d.late_orders,
+        d.late_order,
         d.late_delivery_rate,
         d.avg_late_delay_days,
         d.avg_review_score,
@@ -388,11 +391,11 @@ SELECT
         d.review_score_gap,
 
         CASE
-            WHEN d.late_orders >= 150 
+            WHEN d.late_order >= 150 
                  AND d.review_score_gap >= 1.5
             THEN 'High Priority'
 
-            WHEN d.late_orders >= 50 
+            WHEN d.late_order >= 50 
                  AND d.review_score_gap >= 1.0
             THEN 'Medium Priority'
 
@@ -412,4 +415,4 @@ ORDER BY
         WHEN priority_level = 'Medium Priority' THEN 2
         ELSE 3
     END,
-    late_orders DESC;
+    late_order DESC;
